@@ -1,0 +1,7 @@
+open-webui
+fastmcp
+ollama
+pytest
+pylint
+coverage
+python-dotenv

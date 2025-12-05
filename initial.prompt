@@ -1,0 +1,19 @@
+create a new python project in "AntiGravityProjects\room-temp-open-web-ui" please install open-web-ui (you can clone either the repository or install it as a dependency whatever suits best).
+We will create a simple OpenWebUI designed to first run on my laptop (no graphic card, only 8GB SSD RAM) and later be run on a nvidia jetson nano with 8GB Graphic RAM.
+Currently we want to integrate a local LLM (max size 4b, e.g. Qwen3:4b or even smaller for faster response something like 1.5b or 0.5b size) (you can choose between LLM Studio or Ollama which I have already installed. please use fastMCP Library for the agent.
+I have 5 ESP32 devices in my local wlan, each providing a fastMCP Server compatible with the python fastmcp library (see example_client.py). 
+urls range from "http://192.168.0.91:8080/mcp" to "http://192.168.0.95:8080/mcp", please make a config.json containing the urls and a name property (I will add later all roomnames like "bathroom", "livingroom", ...).
+install all dependencies
+make a proper requirements.txt
+
+the web-ui shall be accessible in  my local wlan home network.
+It shall provide a simple chat with the 1.5b mini model (tooluse is necessary) the llm shall have access to the tools from all 5 mcp servers.
+
+please make a local git repository for it. Do not upload anything before I have manually checked that no private data (e.g. Network password, WLAN password, WLAN SSID are very important to keep private)
+prepare git workflow files for e.g. building a docker container.
+also prepare a dockerfile and everything necessary to build a docker container.
+
+Please also add pytest or unittest and write tests if you feel it would be necessary.
+please also write doc-strings for all methods (install pylint and add a git workflow to check pull-requests to 'main' branch for pylint)
+also install coverage, create a coveragerc file and exclude folders you think are not necessary to check for coverage.
+ 
