@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.env
+.webui_secret_key
+.DS_Store
+*.log
+coverage.xml
+.coverage
+htmlcov/
+tests/
+uv.lock
