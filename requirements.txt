@@ -1,8 +1,8 @@
-open-webui
 fastmcp
-ollama
-pytest
-pylint
-coverage
 python-dotenv
 pydantic
+fastapi
+uvicorn
+jinja2
+httpx
+ollama
