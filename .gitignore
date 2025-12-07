@@ -7,7 +7,7 @@ venv/
 env/
 .idea/
 .vscode/
-config.json
+utils/config.json
 *.log
 coverage.xml
 .coverage
