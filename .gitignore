@@ -16,3 +16,5 @@ htmlcov/
 *.db
 *.sqlite3
 data/
+
+gemini.md

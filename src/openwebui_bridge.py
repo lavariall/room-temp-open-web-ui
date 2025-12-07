@@ -5,43 +5,31 @@ Content of this file can be pasted into OpenWebUI Tools section,
 or used as a module if properly configured.
 """
 
-import json
 import asyncio
 import os
-from typing import Dict, Any, Optional
+import sys
+from typing import Optional
 
-try:
-    from fastmcp import Client
-    from fastmcp.client.transports import StreamableHttpTransport
-except ImportError:
-    # Fallback or error if fastmcp is not installed in the OpenWebUI environment
-    print("fastmcp not installed")
-    Client = None
-    StreamableHttpTransport = None
+# Ensure we can import from utils if running as a script or module in project
+# If pasted into OpenWebUI, 'utils' needs to be available or this logic adjusted.
+# We assume this file is in 'src/' and 'utils/' is in project root.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
+from utils.config import Config
 
 class Tools:
     def __init__(self):
-        # Path to config.json - adjust if necessary relative to where OpenWebUI runs
-        # In Docker, we usually mount the project to /app
-        self.config_path = os.getenv("MCP_CONFIG_PATH", "/app/config.json")
-        self.servers = self._load_config()
-
-    def _load_config(self) -> list:
         try:
-            if not os.path.exists(self.config_path):
-                # Try local relative path for testing
-                local_path = "config.json"
-                if os.path.exists(local_path):
-                    self.config_path = local_path
-                else:
-                    return []
-            
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get("mcp_servers", [])
+            self.config_manager = Config()
+            self.servers = self.config_manager.mcp_servers
         except Exception as e:
-            print(f"Error loading config: {e}")
-            return []
+            self.servers = []
+            print(f"Configuration could not be loaded: {e}")
 
     async def get_room_climate(self, room_name: str) -> str:
         """
@@ -52,41 +40,61 @@ class Tools:
                         Available default keys: room_91, room_92, room_93, room_94, room_95.
         :return: JSON string with temperature and humidity or error message.
         """
-        if not Client:
-            return "Error: fastmcp library not installed."
+        if not self.servers:
+             return "Error: No server configuration loaded."
 
         # Find the server url for the given room_name
-        # Simple matching: checks if room_name is in the config name
-        target_server = next((s for s in self.servers if s["name"] == room_name), None)
+        target_server = next((s for s in self.servers if s.name == room_name), None)
         
-        # If not found, try fuzzy match or fallback (logic can be improved)
         if not target_server:
-            # Fallback for "bathroom" -> "room_91" mapping logic if user hasn't updated config yet
-            # For now, just return error to encourage correct usage
-            available = [s["name"] for s in self.servers]
+            available = [s.name for s in self.servers]
             return f"Error: Room '{room_name}' not found. Available rooms: {', '.join(available)}"
 
-        url = target_server["url"]
+        url = target_server.url
+        token = target_server.token
         
-        try:
-            # Using fastmcp client to call the tool 'get_temperature_and_humidity'
-            # We assume the MCP server provides this tool as per description
-            transport = StreamableHttpTransport(url=url)
-            async with Client(transport=transport) as client:
-                result = await client.call_tool("get_temperature_and_humidity")
-                # result.content should be the list of content blocks
-                # We format it nicely
-                return f"Climate data for {room_name}: {result.content}"
-        except Exception as e:
-            return f"Error connecting to {room_name} ({url}): {str(e)}"
+        attempts = 3
+        timeout_seconds = 5
+        last_error = None
+
+        for attempt in range(attempts):
+            try:
+                # Using fastmcp client to call the tool 'get_temperature_and_humidity'
+                transport = StreamableHttpTransport(
+                    url=url,
+                    headers={
+                        "Authorization": f"Bearer {token}"
+                    }
+                )
+                
+                async with Client(transport=transport) as client:
+                    # Enforce timeout on the tool call
+                    result = await asyncio.wait_for(
+                        client.call_tool("get_temperature_and_humidity"),
+                        timeout=timeout_seconds
+                    )
+                    return f"Climate data for {room_name}: {result.content}"
+                    
+            except Exception as e:
+                last_error = e
+                # Don't wait after the last attempt
+                if attempt < attempts - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s...
+                    print(f"Attempt {attempt + 1}/{attempts} failed for {room_name}: {e}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+        
+        return f"Error connecting to {room_name} ({url}) after {attempts} attempts: {str(last_error)}"
 
 # For testing functionality without OpenWebUI
 if __name__ == "__main__":
     async def main():
         tools = Tools()
-        print(f"Loaded servers: {[s['name'] for s in tools.servers]}")
-        # Test call - assumes server is running, otherwise will error roughly
-        res = await tools.get_room_climate("room_91")
-        print(res)
+        if tools.servers:
+            print(f"Loaded servers: {[s.name for s in tools.servers]}")
+            # Test call
+            res = await tools.get_room_climate("room_91")
+            print(res)
+        else:
+            print("No servers loaded.")
 
     asyncio.run(main())
