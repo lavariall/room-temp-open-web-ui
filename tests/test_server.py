@@ -1,15 +1,24 @@
 """
 Tests for the server module.
 """
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock, mock_open
 import pytest
-from src.server import init_app, fetch_room_data
+from src.server import init_app, fetch_room_data, load_config
+
+def test_load_config():
+    """Test loading configuration."""
+    mock_data = '{"rooms": []}'
+    with patch("builtins.open", mock_open(read_data=mock_data)):
+        config = load_config()
+        assert config == {"rooms": []}
 
 @pytest.mark.asyncio
 async def test_index_route(aiohttp_client):
     """Test the main index route."""
-    app = await init_app()
-    client = await aiohttp_client(app)
+    with patch('src.server.load_config') as mock_config:
+        mock_config.return_value = {"rooms": [{"name": "Test Room", "ip": "1.2.3.4", "token": "abc"}]}
+        app = await init_app()
+        client = await aiohttp_client(app)
 
     # Mock aggregation to avoid real network calls during test
     with patch('src.server.fetch_room_data', new_callable=AsyncMock) as mock_fetch:
