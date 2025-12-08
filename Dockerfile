@@ -13,11 +13,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Expose the port Open WebUI runs on (default 8080)
-EXPOSE 8080
+# Expose the default FastMCP port (can be overridden)
+EXPOSE 8000
 
-# Environment variable to ensure Open WebUI listens on all interfaces
+# Environment variables
+ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
-ENV PORT=8080
+ENV PORT=8000
 
-CMD ["open-webui", "serve"]
+# Run the Web App (FastAPI + Frontend)
+CMD ["python", "src/web_app.py"]

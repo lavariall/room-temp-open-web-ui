@@ -1,8 +1,11 @@
+"""
+Module for aggregating tools from multiple MCP servers.
+"""
 
 import json
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional  # pylint: disable=unused-import
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
@@ -38,13 +41,13 @@ class MCPAggregator:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 headers = data.get("mcp_servers", [])
-                logger.info(f"Loaded {len(headers)} servers from config.")
+                logger.info("Loaded %d servers from config.", len(headers))
                 return headers
         except FileNotFoundError:
-            logger.error(f"Config file not found at {self.config_path}")
+            logger.error("Config file not found at %s", self.config_path)
             return []
         except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from {self.config_path}")
+            logger.error("Error decoding JSON from %s", self.config_path)
             return []
 
     async def list_all_tools(self) -> Dict[str, List[Any]]:
@@ -60,7 +63,7 @@ class MCPAggregator:
             url = server.get("url")
             if not url:
                 continue
-            
+
             # Note: In a real app, we might want to cache clients or keep connections open
             # But FastMCP client is often used as a context manager
             try:
@@ -68,14 +71,18 @@ class MCPAggregator:
                 async with Client(transport=transport) as client:
                     tools = await client.list_tools()
                     all_tools[name] = tools
-                    logger.info(f"Retrieved {len(tools)} tools from {name}")
-            except Exception as e:
-                logger.error(f"Failed to list tools from {name} ({url}): {e}")
+                    logger.info("Retrieved %d tools from %s", len(tools), name)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error(
+                    "Failed to list tools from %s (%s): %s", name, url, e
+                )
                 all_tools[name] = []
-        
+
         return all_tools
 
-    async def call_tool_on_server(self, server_name: str, tool_name: str, arguments: Dict[str, Any] = None) -> Any:
+    async def call_tool_on_server(
+        self, server_name: str, tool_name: str, arguments: Dict[str, Any] = None
+    ) -> Any:
         """
         Calls a specific tool on a specific server.
 
@@ -98,12 +105,13 @@ class MCPAggregator:
                 result = await client.call_tool(tool_name, arguments=arguments)
                 return result
         except Exception as e:
-            logger.error(f"Error calling tool {tool_name} on {server_name}: {e}")
+            logger.error("Error calling tool %s on %s: %s", tool_name, server_name, e)
             raise
 
 if __name__ == "__main__":
     # Example usage
     async def main():
+        """Main function for testing aggregation."""
         agg = MCPAggregator()
         tools = await agg.list_all_tools()
         print(json.dumps(str(tools), indent=2))
