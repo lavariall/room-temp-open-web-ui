@@ -1,0 +1,11 @@
+[master]
+ignore=CVS
+disable=
+    C0111, # missing-docstring
+    C0103, # invalid-name (often for short vars like 'f' or 'db')
+    R0903, # too-few-public-methods
+    W0718, # broad-exception-caught (we want to catch generic exceptions in loop)
+    C0303, # trailing-whitespace
+
+[MESSAGES CONTROL]
+max-line-length=120

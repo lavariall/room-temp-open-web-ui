@@ -1,32 +1,72 @@
-
 """
-OpenWebUI Bridge Entrypoint
-Exposes the Tools class as a FastMCP server.
+Lightweight aiohttp server for aggregating room temperature and humidity.
 """
+import asyncio
+import json
+import os
+import aiohttp
+import aiohttp_jinja2
+import jinja2
+from aiohttp import web
 
-from fastmcp import FastMCP
-from src.openwebui_bridge import Tools
+# Configuration
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'utils', 'config.json')
+STATIC_PATH = os.path.join(os.path.dirname(__file__), 'templates')
 
-# Initialize FastMCP Server
-mcp = FastMCP("room-temp-bridge")
+def load_config():
+    """Load configuration from JSON file."""
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-# Initialize our Tools wrapper
-bridge_tools = Tools()
+async def fetch_room_data(session, room):
+    """Fetch temperature and humidity from a single room."""
+    url = f"http://{room['ip']}/temphum" # User specified path
+    headers = {"Authorization": f"Bearer {room['token']}"}
+    try:
+        async with session.get(url, headers=headers, timeout=5) as response:
+            if response.status == 200:
+                data = await response.json()
+                # Expected: {"temperature": "22.5", "humidity": "54"}
+                return {
+                    "name": room['name'],
+                    "temp": f"{data.get('temperature', '?')}°C",
+                    "humidity": f"{data.get('humidity', '?')}%",
+                    "status": "online"
+                }
+            return {"name": room['name'], "status": "offline", "error": f"Status {response.status}"}
+    except Exception as e:
+        return {"name": room['name'], "status": "offline", "error": str(e)}
 
-@mcp.tool()
-async def get_room_climate(room_name: str) -> str:
-    """
-    Get the temperature and humidity for a specific room.
+async def handle_index(request):
+    """Handle the main page request by aggregating data."""
+    config = request.app['config']
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_room_data(session, room) for room in config['rooms']]
+        rooms_data = await asyncio.gather(*tasks)
+    
+    return aiohttp_jinja2.render_template('index.html', request, {'rooms': rooms_data})
 
-    Args:
-        room_name: The name of the room (e.g., 'room_91', 'livingroom').
-                   Available default keys: room_91, room_92, room_93, room_94, room_95.
-    Returns:
-        JSON string with temperature and humidity or error message.
-    """
-    return await bridge_tools.get_room_climate(room_name)
+async def init_app():
+    """Initialize the aiohttp application."""
+    app = web.Application()
+    
+    # Load config
+    app['config'] = load_config()
+    
+    # Setup Jinja2
+    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates')))
+    
+    # Routes
+    app.router.add_get('/', lambda r: web.HTTPFound('/roomstemphum'))
+    app.router.add_get('/roomstemphum', handle_index)
+    
+    # Static files
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    if os.path.exists(static_dir):
+        app.router.add_static('/static/', static_dir, name='static')
 
-if __name__ == "__main__":
-    # fastmcp run will handle the execution loop if invoked via CLI
-    # but we will run it programmatically
-    mcp.run()
+    return app
+
+if __name__ == '__main__':
+    web.run_app(init_app(), host='0.0.0.0', port=8000)

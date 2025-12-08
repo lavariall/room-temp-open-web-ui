@@ -1,4 +1,4 @@
-# Room Temp Open Web UI
+# Room Temp Hum Server
 
 This project integrates Open WebUI with local MCP servers to monitor room temperature and humidity.
 
@@ -14,7 +14,7 @@ This project integrates Open WebUI with local MCP servers to monitor room temper
 1.  **Clone the repository:**
     ```bash
     git clone <repository_url>
-    cd room-temp-open-web-ui
+    cd room-temp-hum-server
     ```
 
 2.  **Install Dependencies using uv:**
@@ -39,11 +39,11 @@ Access the UI at `http://localhost:8080`.
 
 1.  Build the image:
     ```bash
-    docker build -t room-temp-open-web-ui .
+    docker build -t room-temp-hum-server .
     ```
 2.  Run the container:
     ```bash
-    docker run -p 8080:8080 -v $(pwd)/config.json:/app/config.json --name open-webui room-temp-open-web-ui
+    docker run -p 8080:8080 -v $(pwd)/config.json:/app/config.json --name open-webui room-temp-hum-server
     ```
 
 ## Integrating with Open WebUI

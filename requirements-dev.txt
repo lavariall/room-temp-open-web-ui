@@ -1,5 +1,0 @@
-pytest
-pylint
-coverage
-ollama
-pytest-asyncio
