@@ -30,7 +30,7 @@ def run_command(command, description, capture_output=False):
 def main():
     # 1. Run Pylint
     print("\n=== 1. Linting (Pylint) ===")
-    _, lint_output = run_command("pylint src tests", "Pylint", capture_output=True)
+    _, lint_output = run_command(f"{sys.executable} -m pylint src tests", "Pylint", capture_output=True)
     
     # Parse Pylint score
     lint_score = 0.0
@@ -43,7 +43,11 @@ def main():
     # 2. Run Coverage with Pytest
     print("\n=== 2. Testing & Coverage ===")
     # Create coverage html report in tests/htmlcov
-    cov_cmd = "coverage run -m pytest && coverage report && coverage html -d tests/htmlcov"
+    cov_cmd = (
+        f"{sys.executable} -m coverage run -m pytest && "
+        f"{sys.executable} -m coverage report && "
+        f"{sys.executable} -m coverage html -d tests/htmlcov"
+    )
     test_success, output = run_command(cov_cmd, "Pytest with Coverage", capture_output=True)
     
     # Extract percentage
