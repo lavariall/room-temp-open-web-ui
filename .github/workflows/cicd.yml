@@ -49,4 +49,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: lavariall/room-temp-open-web-ui:latest
+        tags: lavariall/room-temp-hum-server:latest

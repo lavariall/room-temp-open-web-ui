@@ -1,25 +1,27 @@
-FROM python:3.11-slim
+# Multi-stage build for minimal size
+FROM python:3.11-alpine as builder
 
 WORKDIR /app
 
-# Install system dependencies if any (Open WebUI might need some)
-RUN apt-get update && apt-get install -y \
-    git \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for aiohttp (if needed for alpine)
+RUN apk add --no-cache build-base
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
+# Final stage
+FROM python:3.11-alpine
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application code
 COPY . .
 
-# Expose the default FastMCP port (can be overridden)
+# Expose port
 EXPOSE 8000
 
-# Environment variables
-ENV PYTHONPATH=/app
-ENV HOST=0.0.0.0
-ENV PORT=8000
-
-# Run the Web App (FastAPI + Frontend)
-CMD ["python", "src/web_app.py"]
+# Run the server
+CMD ["python", "src/server.py"]

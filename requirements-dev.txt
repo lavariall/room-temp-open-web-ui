@@ -1,5 +1,5 @@
-pytest
 pylint
+pytest
 coverage
-ollama
 pytest-asyncio
+pytest-aiohttp
