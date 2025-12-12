@@ -27,13 +27,15 @@
                 </div>
                 <div class="card-body">
                     {% if room.status == 'online' %}
-                    <div class="metric">
-                        <span class="icon">🌡️</span>
-                        <span class="value">{{ room.temp }}</span>
-                    </div>
-                    <div class="metric">
-                        <span class="icon">💧</span>
-                        <span class="value">{{ room.humidity }}</span>
+                    <div class="metrics-row">
+                        <div class="metric">
+                            <span class="icon">🌡️</span>
+                            <span class="value">{{ room.temp }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="icon">💧</span>
+                            <span class="value">{{ room.humidity }}</span>
+                        </div>
                     </div>
                     {% else %}
                     <div class="error-state">
@@ -42,6 +44,10 @@
                     </div>
                     {% endif %}
                 </div>
+                <!-- History Graph Container (Hidden by default) -->
+                <div class="history-graph-container" id="history-{{ room.name }}">
+                    <canvas id="canvas-{{ room.name }}"></canvas>
+                </div>
             </div>
             {% endfor %}
         </main>
@@ -49,9 +55,208 @@
 
     <script>
         // Simple auto-reload every 60 seconds to keep data fresh
-        setTimeout(() => {
-            window.location.reload();
+        // Only reload if no history view is expanded
+        let isExpanded = false;
+
+        setInterval(() => {
+            if (!isExpanded) {
+                window.location.reload();
+            }
         }, 60000);
+
+        // Toggle History View
+        document.querySelectorAll('.room-card').forEach(card => {
+            card.addEventListener('click', async (e) => {
+                e.stopPropagation(); // Prevent bubbling
+
+                const roomName = card.querySelector('h2').innerText;
+                const historyContainer = document.getElementById(`history-${roomName}`);
+                const isCurrentExpanded = card.classList.contains('expanded');
+
+                // Collapse all others
+                document.querySelectorAll('.room-card.expanded').forEach(c => {
+                    c.classList.remove('expanded');
+                    const rName = c.querySelector('h2').innerText;
+                    document.getElementById(`history-${rName}`).classList.remove('visible');
+                });
+
+                if (!isCurrentExpanded) {
+                    card.classList.add('expanded');
+                    isExpanded = true;
+                    // Defer visibility to allow layout to update
+                    requestAnimationFrame(() => {
+                        historyContainer.classList.add('visible');
+                    });
+
+                    await loadAndDrawHistory(roomName);
+                } else {
+                    isExpanded = false;
+                    historyContainer.classList.remove('visible');
+                }
+            });
+        });
+
+        async function loadAndDrawHistory(roomName) {
+            try {
+                const response = await fetch(`/roomstemphum/history/${roomName}`);
+                if (!response.ok) throw new Error('Failed to load history');
+
+                const data = await response.json();
+                if (data.history) {
+                    drawGraph(roomName, data.history);
+                }
+            } catch (err) {
+                console.error("Error loading history:", err);
+            }
+        }
+
+        function drawGraph(roomName, history) {
+            const canvas = document.getElementById(`canvas-${roomName}`);
+            const ctx = canvas.getContext('2d');
+
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = 150;
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Margins for axes
+            const marginLeft = 30;
+            const marginBottom = 20;
+            const graphW = w - marginLeft;
+            const graphH = h - marginBottom;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Style for Axes
+            ctx.strokeStyle = '#94a3b8'; // Light grey
+            ctx.fillStyle = '#94a3b8';
+            ctx.lineWidth = 1;
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+
+            // --- Y-Axis (0, 10, 20, 30, 40) ---
+            const yLabels = [0, 10, 20, 30, 40];
+            const maxVal = 45;
+            const minVal = 0;
+
+            const mapY = (val) => {
+                const ratio = (val - minVal) / (maxVal - minVal);
+                return graphH - (ratio * graphH); // relative to top of graph area
+            };
+
+            // Draw Y-Axis Line
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, 0);
+            ctx.lineTo(marginLeft, graphH);
+            ctx.stroke();
+
+            // Draw Y Ticks and Labels
+            yLabels.forEach(val => {
+                const y = mapY(val);
+                ctx.beginPath();
+                ctx.moveTo(marginLeft, y);
+                ctx.lineTo(marginLeft + 4, y);
+                ctx.stroke();
+                ctx.fillText(val, marginLeft - 6, y);
+            });
+
+            // --- X-Axis (4, 3, 2, 1) ---
+            // Draw X-Axis Line
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, graphH);
+            ctx.lineTo(w, graphH);
+            ctx.stroke();
+
+            const xLabels = [4, 3, 2, 1];
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            xLabels.forEach(val => {
+                const ratio = (4 - val) / 4;
+                const x = marginLeft + (ratio * graphW);
+
+                ctx.beginPath();
+                ctx.moveTo(x, graphH);
+                ctx.lineTo(x, graphH - 4);
+                ctx.stroke();
+                ctx.fillText(val, x, graphH + 4);
+            });
+
+            // --- Plot Data ---
+            if (!history || history.length === 0) return;
+
+            const timestamps = history.map(p => new Date(p.timestamp).getTime());
+            let minTime = Math.min(...timestamps);
+            let maxTime = Math.max(...timestamps);
+            let timeRange = maxTime - minTime;
+
+            const getX = (isoTimestamp) => {
+                const t = new Date(isoTimestamp).getTime();
+                let ratio = 0;
+                if (Math.abs(timeRange) < 1000) {
+                    ratio = 1.0;
+                } else {
+                    ratio = (t - minTime) / timeRange;
+                }
+                return marginLeft + (ratio * graphW);
+            };
+
+            const getY = (temp) => {
+                return mapY(Math.max(minVal, Math.min(maxVal, temp)));
+            };
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, graphH);
+            gradient.addColorStop(0, '#a855f7');
+            gradient.addColorStop(0.2, '#ef4444');
+            gradient.addColorStop(0.5, '#22c55e');
+            gradient.addColorStop(1, '#38bdf8');
+
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = gradient;
+
+            ctx.beginPath();
+
+            if (history.length === 1) {
+                const y = getY(history[0].temp);
+                ctx.moveTo(marginLeft, y);
+                ctx.lineTo(w, y);
+            } else {
+                let first = true;
+                history.forEach(point => {
+                    const x = getX(point.timestamp);
+                    const y = getY(point.temp);
+                    if (first) {
+                        ctx.moveTo(x, y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+            }
+            ctx.stroke();
+
+            // Dots
+            history.forEach(point => {
+                const x = getX(point.timestamp);
+                const y = getY(point.temp);
+                ctx.fillStyle = matchColor(point.temp);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function matchColor(temp) {
+            if (temp >= 30) return '#ef4444';
+            if (temp >= 25) return '#a855f7';
+            if (temp >= 20) return '#22c55e';
+            return '#38bdf8';
+        }
     </script>
 </body>
 
