@@ -142,6 +142,7 @@ h1 {
 
 .history-graph-container {
     height: 0;
+    visibility: hidden;
     overflow: hidden;
     transition: height 0.3s ease, margin-top 0.3s ease;
     opacity: 0;
@@ -151,6 +152,7 @@ h1 {
 
 .history-graph-container.visible {
     height: 150px;
+    visibility: visible;
     /* Match canvas height */
     opacity: 1;
     margin-top: 1.5rem;
